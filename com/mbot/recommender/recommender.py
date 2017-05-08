@@ -95,13 +95,23 @@ def main():
 
     # optimizer
     optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-    train = optimizer.minimize(cost)
+
+    global_step = tf.Variable(0, name='global_step', trainable=False)
+
+    train = optimizer.minimize(cost, global_step=global_step)
 
     sess = tf.Session()
     init = tf.global_variables_initializer()
 
+    # Saver for saving the model after training
+    saver = tf.train.Saver([user_features, movie_features])
+
+
     # initialize the variables
     sess.run(init)
+
+    # Save the model
+    saver.save(sess, "../../../model/svd-model", write_meta_graph=True)
 
     # train
     for step in range(10000):
@@ -111,9 +121,18 @@ def main():
         #       sess.run(cost, {rating_mat: rating_exist_data, rating_exist: rating_exist_data}), "Movie features -->",
         #       sess.run(movie_features), "User features -->", sess.run(user_features))
         sess.run(train, {rating_mat: rating_mat_data, rating_exist: rating_exist_data})
+        if step % 100 == 0:
+            # save the model after certain iterations
+            saver.save(sess, "../../../model/svd-model", global_step=global_step)
 
-    # print the calculated ratings
-    print(sess.run(tf.matmul(user_features, movie_features, transpose_b=True)))
+    with tf.Session() as sess:
+        # Restore variables from disk.
+        print("Model restored.")
+        saver = tf.train.import_meta_graph("../../../model/svd-model.meta")
+
+        saver.restore(sess, tf.train.latest_checkpoint('../../../model/'))
+        # print the calculated ratings
+        print(sess.run(tf.matmul(user_features, movie_features, transpose_b=True)))
 
 
 if __name__ == "__main__":

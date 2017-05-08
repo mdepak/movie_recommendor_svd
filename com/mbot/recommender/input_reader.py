@@ -12,7 +12,7 @@ class InputData:
 
 
 def read(file, ratings, rating_exists):
-    file_path = "D:\\Bit_Bucket\\bot\data\\movielens_100k\\ml-100k\\" + file
+    file_path = "../../../data/ml-100k/" + file
     data = list(csv.reader(open(file_path), delimiter='\t'))
     for row in data:
         ratings[(int(row[0])) - 1][(int(row[1])) - 1] = int(row[2])
