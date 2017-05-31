@@ -1,5 +1,6 @@
 # Program of recommending movies
 import math
+import os
 
 import numpy as np
 import tensorflow as tf
@@ -63,49 +64,67 @@ def main():
 
     learning_rate = 0.001
 
-    rating_mat = tf.placeholder(tf.float32, [input_data.user_cnt, input_data.movie_cnt])
+    rating_mat = tf.placeholder(tf.float32, [input_data.user_cnt, input_data.movie_cnt], name="ratings")
     rating_exist = tf.placeholder(tf.float32, [input_data.user_cnt, input_data.movie_cnt])
 
     # Parameters to be learned
     user_features = tf.Variable(tf.random_normal([input_data.user_cnt, input_data.feature_cnt],
-                                                 dtype=tf.float32))  # user features to be learned
+                                                 dtype=tf.float32), name="user_feature")  # user features to be learned
     movie_features = tf.Variable(tf.random_normal([input_data.movie_cnt, input_data.feature_cnt]),
-                                 dtype=tf.float32)  # movies features to be learned
+                                 dtype=tf.float32, name="movie_feature")  # movies features to be learned
 
     # cost = cost_function(rating_mat, rating_exist, user_features, movie_features)
     # tf.clip_by_value(user_features, 1e-10, 1e+10), tf.clip_by_value(movie_features, 1e-10, 1e+10)
 
     # Clip off the values as the gradients may be vanishing (gradients and features tend to negative infinity).
     # Clipping can also be used for exploding gradients (weights are updated with infinity).
-    rating_cal = tf.matmul(tf.clip_by_value(user_features, 1e-1, 1e+1), tf.clip_by_value(movie_features, 1e-1, 1e+1),
+    rating_cal = tf.matmul(tf.clip_by_value(user_features, 1e-1, 1e+1, name="user_feature"),
+                           tf.clip_by_value(movie_features, 1e-1, 1e+1, name="movie_feature"),
                            transpose_b=True)
-    rating_pred = tf.multiply(rating_cal, rating_exist)  # does element wise matrix multiplication
+    rating_pred = tf.multiply(rating_cal, rating_exist, name="predictRating")  # does element wise matrix multiplication
 
     # Regularization so that the learned weights will generalize for new input.
-    user_regularization = tf.reduce_sum(np.square(tf.clip_by_value(user_features, 1e-1, 1e+1)))
-    movie_regularization = tf.reduce_sum(tf.square(tf.clip_by_value(movie_features, 1e-1, 1e+1)))
+    user_regularization = tf.reduce_sum(np.square(tf.clip_by_value(user_features, 1e-1, 1e+1, name="user_feature")),
+                                        name="user_reg")
+    movie_regularization = tf.reduce_sum(tf.square(tf.clip_by_value(movie_features, 1e-1, 1e+1, name="movie_feature")),
+                                         name="movie_reg")
 
     # cost function
-    cost = tf.reduce_sum(tf.square(rating_mat - rating_pred)) + (learning_rate) * (
+    cost = tf.reduce_sum(tf.square(rating_mat - rating_pred), name="square_error") + (learning_rate) * (
         user_regularization + movie_regularization)
 
     # cost = tf.reduce_sum(tf.square(rating_mat - rating_pred))
 
     # cost = tf.reduce_mean(cost)
 
+    # summary for cost to be displayed in TensorBoard
+    tf.summary.scalar("cost", cost)
+
+    # Summary - histogram for feature vectors
+    tf.summary.histogram("user_feature", user_features)
+    tf.summary.histogram("movie_feature", movie_features)
+
     # optimizer
     optimizer = tf.train.GradientDescentOptimizer(learning_rate)
 
     global_step = tf.Variable(0, name='global_step', trainable=False)
 
-    train = optimizer.minimize(cost, global_step=global_step)
+    with tf.name_scope("train"):
+        train = optimizer.minimize(cost, global_step=global_step)
 
     sess = tf.Session()
     init = tf.global_variables_initializer()
 
+    # merge all the summary and write the summary to disk
+    merged_summary = tf.summary.merge_all()
+
+    # Writer for generating graph
+    writer = tf.summary.FileWriter(os.path.realpath(os.path.join(os.path.dirname(__file__), "../../../graph/")))
+
+    writer.add_graph(sess.graph)
+
     # Saver for saving the model after training
     saver = tf.train.Saver([user_features, movie_features])
-
 
     # initialize the variables
     sess.run(init)
@@ -124,6 +143,10 @@ def main():
         if step % 100 == 0:
             # save the model after certain iterations
             saver.save(sess, "../../../model/svd-model", global_step=global_step)
+
+        if step % 10 == 0:
+            summary = sess.run(merged_summary, {rating_mat: rating_mat_data, rating_exist: rating_exist_data})
+            writer.add_summary(summary, step)
 
     with tf.Session() as sess:
         # Restore variables from disk.
