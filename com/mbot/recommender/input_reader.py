@@ -1,4 +1,5 @@
 import csv
+import os
 
 import numpy as np
 
@@ -12,7 +13,11 @@ class InputData:
 
 
 def read(file, ratings, rating_exists):
-    file_path = "../../../data/ml-100k/" + file
+    script_path = os.path.dirname(__file__)
+    file_path = os.path.join("../../../data/ml-100k", file)
+    file_path = os.path.join(script_path, file_path)
+    file_path = os.path.realpath(file_path)
+
     data = list(csv.reader(open(file_path), delimiter='\t'))
     for row in data:
         ratings[(int(row[0])) - 1][(int(row[1])) - 1] = int(row[2])
