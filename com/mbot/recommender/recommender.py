@@ -5,7 +5,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from com.mbot.recommender.input_reader import read_input_data
+from com.mbot.recommender.input_reader import read_input_data, read_mvoies_meta_data
 
 
 def print_sparsity(matrix):
@@ -49,8 +49,44 @@ def cosine_similarity(v1, v2):
     return np.dot(v1, v2) / math.sqrt(np.sum(np.square(v1)), np.sum(np.square(v2)))
 
 
+def cosine_similarity_embeddings(embeddings, valid_dataset):
+    """Compute the cosine similarity between all movies embeddings."""
+    norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))
+    normalized_embeddings = embeddings / norm
+    valid_embeddings = tf.nn.embedding_lookup(normalized_embeddings, valid_dataset)
+    similarity = tf.matmul(
+        valid_embeddings, normalized_embeddings, transpose_b=True)
+    return similarity
+
+
+def plot_with_labels(low_dim_embs, labels, filename='tsne.png'):
+    try:
+        from sklearn.manifold import TSNE
+        import matplotlib.pyplot as plt
+
+        # assert low_dim_embs.shape[0] >= len(labels), 'More labels than embeddings'
+
+        tsne = TSNE(perplexity=30, n_components=2, init='pca', n_iter=5000)
+        low_dim_embs = tsne.fit_transform(low_dim_embs)
+
+        plt.figure(figsize=(18, 18))  # in inches
+        for i, label in enumerate(labels):
+            x, y = low_dim_embs[i, :]
+            plt.scatter(x, y)
+            plt.annotate(label,
+                         xy=(x, y),
+                         xytext=(5, 2),
+                         textcoords='offset points',
+                         ha='right',
+                         va='bottom')
+        plt.savefig(filename)
+    except ImportError:
+        print('Please install sklearn, matplotlib, and scipy to show embeddings.')
+
+
 def main():
     input_data = read_input_data()
+    movie_meta = read_mvoies_meta_data('../../../data/ml-100k/u.item')
 
     # Variables and vectors for calculation
     rating_mat_data = input_data.rating_mat
@@ -136,15 +172,13 @@ def main():
     for step in range(10000):
         print("step ", step, "Cost -->",
               sess.run(cost, {rating_mat: rating_exist_data, rating_exist: rating_exist_data}))
-        # print("step ", step, "Cost -->",
-        #       sess.run(cost, {rating_mat: rating_exist_data, rating_exist: rating_exist_data}), "Movie features -->",
-        #       sess.run(movie_features), "User features -->", sess.run(user_features))
         sess.run(train, {rating_mat: rating_mat_data, rating_exist: rating_exist_data})
+
         if step % 100 == 0:
             # save the model after certain iterations
             saver.save(sess, "../../../model/svd-model", global_step=global_step)
 
-        if step % 10 == 0:
+        if step % 100 == 0:
             summary = sess.run(merged_summary, {rating_mat: rating_mat_data, rating_exist: rating_exist_data})
             writer.add_summary(summary, step)
 
@@ -156,7 +190,7 @@ def main():
         saver.restore(sess, tf.train.latest_checkpoint('../../../model/'))
         # print the calculated ratings
         print(sess.run(tf.matmul(user_features, movie_features, transpose_b=True)))
-
+        plot_with_labels(movie_features, movie_meta)
 
 if __name__ == "__main__":
     main()
