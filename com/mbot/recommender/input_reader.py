@@ -30,6 +30,15 @@ def read_files(ratings, rating_exists):
         read(file, ratings, rating_exists)
 
 
+def read_mvoies_meta_data(file):
+    lines = open(os.path.join(os.path.dirname(__file__), file)).readlines()
+    movie_meta = dict()
+    for _ in lines:
+        entires = _.split("|")
+        movie_meta[entires[0]] = entires[1]
+    return movie_meta
+
+
 def read_input_data():
     """ Reads the input data from the 100k movielens dataset"""
     user_cnt = 943
