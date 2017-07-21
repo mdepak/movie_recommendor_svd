@@ -141,7 +141,7 @@ def main():
     tf.summary.histogram("movie_feature", movie_features)
 
     # optimizer
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate)
 
     global_step = tf.Variable(0, name='global_step', trainable=False)
 
@@ -169,28 +169,30 @@ def main():
     saver.save(sess, "../../../model/svd-model", write_meta_graph=True)
 
     # train
-    for step in range(10000):
-        print("step ", step, "Cost -->",
-              sess.run(cost, {rating_mat: rating_exist_data, rating_exist: rating_exist_data}))
+    for step in range(0):
         sess.run(train, {rating_mat: rating_mat_data, rating_exist: rating_exist_data})
 
-        if step % 100 == 0:
+        if step % 1000 == 0:
             # save the model after certain iterations
             saver.save(sess, "../../../model/svd-model", global_step=global_step)
 
         if step % 100 == 0:
+            print("step ", step, "Cost -->",
+                  sess.run(cost, {rating_mat: rating_exist_data, rating_exist: rating_exist_data}))
             summary = sess.run(merged_summary, {rating_mat: rating_mat_data, rating_exist: rating_exist_data})
             writer.add_summary(summary, step)
 
-    with tf.Session() as sess:
-        # Restore variables from disk.
-        print("Model restored.")
-        saver = tf.train.import_meta_graph("../../../model/svd-model.meta")
+    plot_with_labels(movie_features.eval(sess), movie_meta)
 
-        saver.restore(sess, tf.train.latest_checkpoint('../../../model/'))
-        # print the calculated ratings
-        print(sess.run(tf.matmul(user_features, movie_features, transpose_b=True)))
-        plot_with_labels(movie_features, movie_meta)
+    # with tf.Session() as sess:
+    #     # Restore variables from disk.
+    #     print("Model restored.")
+    #     saver = tf.train.import_meta_graph("../../../model/svd-model.meta")
+    #
+    #     saver.restore(sess, tf.train.latest_checkpoint('../../../model/'))
+    #     # print the calculated ratings
+    #     print(sess.run(tf.matmul(user_features, movie_features, transpose_b=True)))
+    #     plot_with_labels(movie_features, movie_meta)
 
 if __name__ == "__main__":
     main()
